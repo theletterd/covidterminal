@@ -5,6 +5,7 @@ from asciichartpy import plot
 
 US_DATA_URL = "https://covidtracking.com/api/v1/us/daily.csv"
 US_STATE_DATA_URL = "https://covidtracking.com/api/v1/states/daily.csv"
+METRIC_CHOICES = ["positiveIncrease", "positive", "deathIncrease", "death", "hospitalized", "hospitalizedIncrease", "hospitalizedCurrently", "hospitalizedCumulative"]
 
 class CovidData(object):
 
@@ -15,23 +16,32 @@ class CovidData(object):
     def setup_parser(self):
         parser = argparse.ArgumentParser()
         parser.add_argument("--state", type=str, help="2-character State")
-
+        parser.add_argument(
+            "--metric",
+            type=str,
+            help="metric to draw",
+            choices=METRIC_CHOICES,
+            default=METRIC_CHOICES[0]
+        )
         self.args = parser.parse_args()
 
     def process_args(self):
         self.state = self.args.state
+        self.metric = self.args.metric
 
 
-    def get_data(self, state):
+    def get_data(self, metric, state):
         url = US_DATA_URL
         if state:
             url = US_STATE_DATA_URL
 
+        # TODO don't download the data every time, cache it locally.
+        # maybe just save to a file, and then check against modified time
         csv_data = requests.get(url).text.split('\n')
         headers = csv_data.pop(0).split(',') # remove headers
 
         DATE_INDEX = headers.index("date")
-        DAILY_INCREASE_INDEX = headers.index("positiveIncrease")
+        DAILY_INCREASE_INDEX = headers.index(metric)
         STATE_INDEX = None
         if state:
             STATE_INDEX = headers.index('state')
@@ -64,9 +74,9 @@ class CovidData(object):
         return dates, datapoints
 
 
-    def print_chart(self, dates, datapoints, state=None):
+    def print_chart(self, dates, datapoints, metric, state=None):
         state_string = state or "the USA"
-        print(f"\nCOVID-19 cases in {state_string}, over time\n\n")
+        print(f"\nCOVID-19 {metric} in {state_string}, over time\n\n")
         print(plot(datapoints, dict(height=30, format="{:8.0f}")))
 
     def print_latest_values(self, dates, datapoints, num_latest=10):
@@ -83,8 +93,9 @@ class CovidData(object):
 
     def show_data(self):
         state = self.state
-        dates, datapoints = self.get_data(state)
-        self.print_chart(dates, datapoints, state=state)
+        metric = self.metric
+        dates, datapoints = self.get_data(metric, state)
+        self.print_chart(dates, datapoints, metric, state=state)
         self.print_latest_values(dates, datapoints)
 
 
