@@ -1,6 +1,8 @@
 import argparse
 import requests
 import datetime
+import shutil
+import math
 from asciichartpy import plot
 
 US_DATA_URL = "https://covidtracking.com/api/v1/us/daily.csv"
@@ -71,8 +73,14 @@ class CovidData(object):
 
         datapoints.reverse()
         dates.reverse()
-        return dates, datapoints
 
+        # how many leading zeros do we have?
+        zeros = 0
+        for i in datapoints:
+            if i != 0:
+                break
+            zeros += 1
+        return dates[zeros:], datapoints[zeros:]
 
     def print_chart(self, dates, datapoints, metric, state=None):
         state_string = state or "the USA"
@@ -91,11 +99,28 @@ class CovidData(object):
             print(f"{formatted_date}: {value}")
         print("\n\n")
 
+    def scale_data(self, dates, datapoints):
+        columns, _ = shutil.get_terminal_size()
+        MARGIN = 12
+        scale_factor = math.ceil(len(datapoints) / (columns - MARGIN))
+        print("Scale factor: " + str(scale_factor))
+
+        chunks = []
+        for i in range(0, len(datapoints), scale_factor):
+            chunk = datapoints[i:i+scale_factor]
+            chunks.append(chunk)
+
+        mean_chunks = [(sum(chunk) / len(chunk)) for chunk in chunks]
+        trimmed_dates = dates[::scale_factor]
+        return trimmed_dates, mean_chunks
+
     def show_data(self):
         state = self.state
         metric = self.metric
         dates, datapoints = self.get_data(metric, state)
-        self.print_chart(dates, datapoints, metric, state=state)
+
+        scaled_dates, scaled_datapoints = self.scale_data(dates, datapoints)
+        self.print_chart(scaled_dates, scaled_datapoints, metric, state=state)
         self.print_latest_values(dates, datapoints)
 
 
